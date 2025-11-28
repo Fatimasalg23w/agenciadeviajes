@@ -22,26 +22,26 @@ export default function TourCard({
   tipo,
 }: TourCardProps) {
   return (
-    <div className="bg-white border rounded-lg shadow-md w-40 hover:shadow-lg hover:scale-105 transition-transform duration-300 overflow-hidden">
+    <div className="bg-white border rounded-xl shadow-md w-full max-w-sm hover:shadow-lg hover:scale-[1.02] transition-transform duration-300 overflow-hidden">
       <img
         src={imagen}
         alt={nombre}
-        className="w-full h-16 object-cover"
+        className="w-full h-48 object-cover"
       />
-      <div className="p-2">
-        <h3 className="text-sm font-bold text-gray-800 text-center">{nombre}</h3>
-        <p className="text-xs text-gray-500 text-center">{destino}</p>
-        <p className="mt-1 text-xs text-gray-700 line-clamp-2">{descripcion}</p>
-        <p className="mt-2 text-sm font-semibold text-orange-600 text-center">
+      <div className="p-4">
+        <h3 className="text-lg font-bold text-gray-800 text-center">{nombre}</h3>
+        <p className="text-sm text-gray-500 text-center">{destino}</p>
+        <p className="mt-2 text-sm text-gray-700 line-clamp-2 text-center">{descripcion}</p>
+        <p className="mt-3 text-base font-semibold text-orange-600 text-center">
           ${precio.toLocaleString()}
         </p>
         {fecha_inicio && fecha_fin && (
-          <p className="text-xs text-gray-500 mt-1 text-center">
+          <p className="text-sm text-gray-500 mt-1 text-center">
             {fecha_inicio} - {fecha_fin}
           </p>
         )}
         {tipo && (
-          <span className="block mt-2 mx-auto px-2 py-0.5 text-xs font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-600 rounded-full w-fit">
+          <span className="block mt-3 mx-auto px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-600 rounded-full w-fit">
             {tipo}
           </span>
         )}
