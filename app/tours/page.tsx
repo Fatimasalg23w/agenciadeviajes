@@ -1,7 +1,7 @@
+// app/tours/page.tsx
 import TourCard from "../../components/TourCard";
 
 export default async function ToursPage() {
-  // Consumimos la API interna de Next.js
   const res = await fetch("http://localhost:3000/api/tours", { cache: "no-store" });
   const tours = await res.json();
 
@@ -13,14 +13,13 @@ export default async function ToursPage() {
           <TourCard
             key={tour._id}
             nombre={tour.nombre}
-            destino={tour.destinos?.join(", ")}   // ahora es arreglo
+            destino={tour.destinos?.join(", ")}
             descripcion={tour.descripcion}
-            precio={tour.precio_base}             // usamos precio_base
-            imagen={tour.imagenes?.[0]}           // primera imagen del array
+            precio={tour.precio_base}
+            imagen={tour.imagenes?.[0]}
           />
         ))}
       </div>
     </div>
   );
 }
-

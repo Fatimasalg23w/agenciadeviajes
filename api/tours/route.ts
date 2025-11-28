@@ -1,9 +1,9 @@
-import Tour from "@/models/Tour";
+// app/api/tours/route.ts
 import dbConnect from "@/lib/dbConnect";
+import Tour from "@/models/Tour";
 
-// GET: lista todos los tours
 export async function GET() {
   await dbConnect();
-  const tours = await Tour.find({});
+  const tours = await Tour.find({}).lean();
   return Response.json(tours);
 }

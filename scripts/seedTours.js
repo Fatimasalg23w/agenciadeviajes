@@ -1,13 +1,18 @@
+// scripts/seedTours.ts
 import mongoose from "mongoose";
-import Tour from "../models/Tour.js";
-import toursData from "./toursData.json";
+import Tour from "../models/Tour";
+import toursData from "../data/toursData.json";
 
-async function seed() {
-  await mongoose.connect("mongodb://localhost:27017/explore-mexico");
+async function run() {
+  const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/agenciadeviajes";
+  await mongoose.connect(uri);
   await Tour.deleteMany({});
-  await Tour.insertMany(toursData);
-  console.log("✅ Tours insertados en MongoDB");
-  process.exit();
+  await Tour.insertMany(toursData as any[]);
+  console.log("✅ Tours insertados");
+  await mongoose.disconnect();
 }
 
-seed();
+run().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
