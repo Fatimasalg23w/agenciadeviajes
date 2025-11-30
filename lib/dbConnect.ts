@@ -1,20 +1,21 @@
-// lib/dbConnect.ts
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/agenciadeviajes";
+const MONGODB_URI = process.env.MONGODB_URI as string;
 
-declare global {
-  var mongooseConn: { conn: typeof mongoose | null; promise: Promise<typeof mongoose> | null };
+if (!MONGODB_URI) {
+  throw new Error("⚠️ MONGODB_URI no está definido en .env.local");
 }
 
-global.mongooseConn = global.mongooseConn || { conn: null, promise: null };
+let cached = (global as any).mongoose || { conn: null, promise: null };
 
-export default async function dbConnect() {
-  if (global.mongooseConn.conn) return global.mongooseConn.conn;
+async function dbConnect() {
+  if (cached.conn) return cached.conn;
 
-  if (!global.mongooseConn.promise) {
-    global.mongooseConn.promise = mongoose.connect(MONGODB_URI);
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(MONGODB_URI).then((mongoose) => mongoose);
   }
-  global.mongooseConn.conn = await global.mongooseConn.promise;
-  return global.mongooseConn.conn;
+  cached.conn = await cached.promise;
+  return cached.conn;
 }
+
+export default dbConnect;

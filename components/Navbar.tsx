@@ -7,7 +7,7 @@ export default function Navbar() {
     <nav className="sticky top-0 bg-gradient-to-r from-orange-500/80 via-yellow-600/80 to-amber-700/80 backdrop-blur-md shadow-md z-50 py-4">
       <div className="flex justify-between items-center max-w-6xl mx-auto px-6 text-white">
         {/* Logo a la izquierda */}
-        <h1 className="font-extrabold text-3xl tracking-wide">Explore México Tours</h1>
+        <h1 className="font-extrabold text-3xl tracking-wide">Tres en Ruta</h1>
 
         {/* Links centrados */}
         <div className="flex space-x-8 text-lg font-bold">

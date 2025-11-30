@@ -1,30 +1,20 @@
-// models/Tour.ts
-import mongoose, { Schema, Model, models } from "mongoose";
+import mongoose, { Schema, Document, Model } from "mongoose";
 
-const ItinerarioSchema = new Schema({
-  dia: { type: Number, required: true },
-  ciudad: { type: String, required: true },
-  actividad: { type: String, required: true },
-  hotel_sugerido: { type: String },
-  fecha: { type: String },
-  costo_actividad: { type: Number },
+// Interfaz explícita
+export interface ITour extends Document {
+  name: string;
+  city: string;
+  price: number;
+}
+
+const TourSchema: Schema = new Schema({
+  name: { type: String, required: true },
+  city: { type: String, required: true },
+  price: { type: Number, required: true },
 });
 
-const TourSchema = new Schema(
-  {
-    nombre: { type: String, required: true },
-    destinos: { type: [String], required: true },
-    descripcion: { type: String },
-    precio_base: { type: Number, default: 0 },
-    fecha_inicio: { type: String },
-    fecha_fin: { type: String },
-    imagenes: { type: [String], default: [] },
-    hoteles_por_destino: { type: Schema.Types.Mixed }, // { destino: [hotel1, hotel2, ...] }
-    proveedor_vuelo_hotel: { type: String, default: "Despegar" },
-    itinerario: { type: [ItinerarioSchema], default: [] },
-  },
-  { timestamps: true }
-);
+// Modelo tipado
+const Tour: Model<ITour> =
+  mongoose.models.Tour || mongoose.model<ITour>("Tour", TourSchema);
 
-const Tour: Model<any> = models.Tour || mongoose.model("Tour", TourSchema);
 export default Tour;

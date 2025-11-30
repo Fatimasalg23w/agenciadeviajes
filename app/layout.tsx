@@ -5,7 +5,7 @@ import { Playfair_Display } from "next/font/google";
 const playfair = Playfair_Display({ subsets: ["latin"], weight: ["400", "700"] });
 
 export const metadata = {
-  title: "Explore México Tours",
+  title: "Tres en ruta",
   description: "Tours, vuelos y recompensas en México",
 };
 
