@@ -6,33 +6,56 @@ import { CheckBadgeIcon } from "@heroicons/react/24/outline";
 export default function VerifyPage() {
   const router = useRouter();
   const [code, setCode] = useState("");
-  const [email, setEmail] = useState("");
+  const [pendingUser, setPendingUser] = useState<any>(null);
 
   useEffect(() => {
-    const storedEmail = localStorage.getItem("userEmail");
-    if (storedEmail) setEmail(storedEmail);
+    const storedUser = localStorage.getItem("pendingUser");
+    if (storedUser) {
+      setPendingUser(JSON.parse(storedUser));
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email) {
-      alert("No se encontró el correo del usuario. Regístrate nuevamente.");
+    if (!pendingUser) {
+      alert("No se encontraron datos de registro. Regístrate nuevamente.");
       router.push("/register");
       return;
     }
 
-    const res = await fetch("/api/verify-code", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, code }),
-    });
-    const data = await res.json();
+    // Comparar código ingresado con el guardado en localStorage
+    if (code !== pendingUser.code) {
+      alert("Código incorrecto ❌");
+      localStorage.removeItem("pendingUser");
+      router.push("/register");
+      return;
+    }
 
-    if (data.success) {
-      router.push("/register/verified");
-    } else {
-      alert(data.message || "Código incorrecto ❌");
+    try {
+      // Quitamos el campo code antes de enviar al backend
+      const { code: _, ...userData } = pendingUser;
+
+      const res = await fetch("/api/save-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...userData,
+          status: "verified", // se guarda ya verificado
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        localStorage.removeItem("pendingUser"); // limpiar datos temporales
+        alert("✅ Perfil guardado. Ahora puedes iniciar sesión.");
+        router.push("/login");
+      } else {
+        alert(data.message || "No se pudo crear el usuario.");
+      }
+    } catch (error) {
+      console.error("Error en verificación:", error);
+      alert("Hubo un problema al verificar. Intenta de nuevo.");
     }
   };
 
@@ -65,7 +88,12 @@ export default function VerifyPage() {
 
         <p className="text-center text-sm text-[#556B2F] mt-4">
           ¿No recibiste el código?{" "}
-          <span className="underline cursor-pointer">Reenviar</span>
+          <span
+            className="underline cursor-pointer"
+            onClick={() => router.push("/register")}
+          >
+            Reenviar
+          </span>
         </p>
       </div>
     </main>

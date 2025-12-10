@@ -4,7 +4,7 @@ interface TourCardProps {
   nombre: string;
   destino?: string;
   descripcion?: string;
-  precio?: number; // 👈 ahora opcional
+  precio?: number; 
   imagen?: string;
   fecha_inicio?: string;
   fecha_fin?: string;
@@ -23,12 +23,16 @@ export default function TourCard({
 }: TourCardProps) {
   return (
     <div className="bg-white border rounded-xl shadow-md w-full max-w-sm hover:shadow-lg hover:scale-[1.02] transition-transform duration-300 overflow-hidden">
-      {imagen && (
+      {imagen ? (
         <img
           src={imagen}
           alt={nombre}
           className="w-full h-48 object-cover"
         />
+      ) : (
+        <div className="w-full h-48 bg-gray-200 flex items-center justify-center text-gray-500">
+          Sin imagen
+        </div>
       )}
       <div className="p-4">
         <h3 className="text-lg font-bold text-gray-800 text-center">{nombre}</h3>
@@ -38,12 +42,12 @@ export default function TourCard({
         )}
         {precio !== undefined && (
           <p className="mt-3 text-base font-semibold text-orange-600 text-center">
-            ${precio.toLocaleString()}
+            ${precio.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
           </p>
         )}
         {fecha_inicio && fecha_fin && (
           <p className="text-sm text-gray-500 mt-1 text-center">
-            {fecha_inicio} - {fecha_fin}
+            {fecha_inicio} – {fecha_fin}
           </p>
         )}
         {tipo && (

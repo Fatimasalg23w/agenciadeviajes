@@ -11,11 +11,11 @@ export default function RegisterPage() {
     email: "",
     telefono: "",
     password: "",
-    paisResidencia: "", // nuevo campo
+    paisResidencia: "",
+    sexo: "", // 🔑 nuevo campo
     notRobot: false,
   });
 
-  // ✅ Corregido: manejamos inputs y selects de forma segura
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -28,6 +28,18 @@ export default function RegisterPage() {
     }
   };
 
+  // 🔑 Normalizar país de residencia
+  function normalizeCountry(paisResidencia: string) {
+    const map: Record<string, string> = {
+      Australia: "AUS",
+      UK: "UK",
+      "United Kingdom": "UK",
+      Inglaterra: "UK",
+      ReinoUnido: "UK",
+    };
+    return map[paisResidencia] || paisResidencia;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -36,7 +48,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // Validación de contraseña fuerte en el cliente
     const strongPassword = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
     if (!strongPassword.test(formData.password)) {
       alert(
@@ -46,41 +57,35 @@ export default function RegisterPage() {
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const normalizedEmail = formData.email.trim().toLowerCase();
+    const normalizedCountry = normalizeCountry(formData.paisResidencia);
 
     try {
-      // Enviar código por correo
-      await fetch("/api/send-code", {
+      // 1️⃣ Enviar código por correo
+      const sendRes = await fetch("/api/send-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: formData.email, code }),
+        body: JSON.stringify({ email: normalizedEmail, code }),
       });
-
-      // Guardar usuario en la base (el backend encripta la contraseña y genera clientNumber)
-      const res = await fetch("/api/save-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre: formData.nombre,
-          apellido: formData.apellido,
-          fechaNacimiento: formData.fechaNacimiento,
-          email: formData.email,
-          telefono: formData.telefono,
-          password: formData.password, // se encripta en el backend
-          paisResidencia: formData.paisResidencia,
-          code,
-          status: "pending",
-        }),
-      });
-
-      const data = await res.json();
-      if (!data.success) {
-        alert(data.message || "No se pudo registrar.");
+      const sendData = await sendRes.json();
+      if (!sendData.success) {
+        alert(sendData.message || "No se pudo enviar el código.");
         return;
       }
 
-      // Guardar el correo en localStorage para la verificación
-      localStorage.setItem("userEmail", formData.email.trim().toLowerCase());
+      // 2️⃣ Guardar datos temporalmente en localStorage
+      localStorage.setItem(
+        "pendingUser",
+        JSON.stringify({
+          ...formData,
+          email: normalizedEmail,
+          password: formData.password,
+          paisResidencia: normalizedCountry,
+          code,
+        })
+      );
 
+      // 3️⃣ Redirigir a la página de verificación
       router.push("/register/verify");
     } catch (error) {
       console.error("Error en registro:", error);
@@ -96,67 +101,28 @@ export default function RegisterPage() {
             Registro de Perfil
           </h1>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <input
-              type="text"
-              name="nombre"
-              placeholder="Nombre"
-              onChange={handleChange}
-              className="w-full border rounded-lg p-2"
-              required
-            />
-            <input
-              type="text"
-              name="apellido"
-              placeholder="Apellido"
-              onChange={handleChange}
-              className="w-full border rounded-lg p-2"
-              required
-            />
-            <input
-              type="date"
-              name="fechaNacimiento"
-              onChange={handleChange}
-              className="w-full border rounded-lg p-2"
-              required
-              min="1940-01-01"
-              max={new Date().toISOString().split("T")[0]}
-            />
-            <input
-              type="email"
-              name="email"
-              placeholder="Correo electrónico"
-              onChange={handleChange}
-              className="w-full border rounded-lg p-2"
-              required
-            />
-            <input
-              type="tel"
-              name="telefono"
-              placeholder="Teléfono"
-              onChange={handleChange}
-              className="w-full border rounded-lg p-2"
-              required
-            />
-            <input
-              type="password"
-              name="password"
-              placeholder="Contraseña (mínimo 8 caracteres, letras, números y símbolos)"
-              onChange={handleChange}
-              className="w-full border rounded-lg p-2"
-              required
-            />
+            <input type="text" name="nombre" placeholder="Nombre" onChange={handleChange} className="w-full border rounded-lg p-2" required />
+            <input type="text" name="apellido" placeholder="Apellido" onChange={handleChange} className="w-full border rounded-lg p-2" required />
+            <input type="date" name="fechaNacimiento" onChange={handleChange} className="w-full border rounded-lg p-2" required min="1940-01-01" max={new Date().toISOString().split("T")[0]} />
+            <input type="email" name="email" placeholder="Correo electrónico" onChange={handleChange} className="w-full border rounded-lg p-2" required />
+            <input type="tel" name="telefono" placeholder="Teléfono" onChange={handleChange} className="w-full border rounded-lg p-2" required />
+            <input type="password" name="password" placeholder="Contraseña (mínimo 8 caracteres, letras, números y símbolos)" onChange={handleChange} className="w-full border rounded-lg p-2" required />
 
-            {/* Nuevo campo de país de residencia */}
-            <select
-              name="paisResidencia"
-              onChange={handleChange}
-              className="w-full border rounded-lg p-2"
-              required
-            >
+            {/* 🔑 Nuevo campo: Sexo */}
+            <select name="sexo" onChange={handleChange} className="w-full border rounded-lg p-2" required>
+              <option value="">Selecciona tu sexo</option>
+              <option value="femenino">Femenino</option>
+              <option value="masculino">Masculino</option>
+              <option value="prefiero no decirlo">Prefiero no decirlo</option>
+            </select>
+
+            <select name="paisResidencia" onChange={handleChange} className="w-full border rounded-lg p-2" required>
               <option value="">Selecciona tu país de residencia</option>
               <option value="Australia">Australia</option>
               <option value="UK">UK</option>
               <option value="United Kingdom">United Kingdom</option>
+              <option value="Canada">Canada</option>
+              {/* puedes agregar más países si lo necesitas */}
             </select>
 
             <label className="flex items-center gap-2 text-sm">
@@ -164,10 +130,7 @@ export default function RegisterPage() {
               <span>No soy un robot 🤖</span>
             </label>
 
-            <button
-              type="submit"
-              className="w-full bg-[#a8bb5c] text-white font-semibold py-2 rounded-lg hover:bg-green-700 transition-colors"
-            >
+            <button type="submit" className="w-full bg-[#a8bb5c] text-white font-semibold py-2 rounded-lg hover:bg-green-700 transition-colors">
               Registrarme
             </button>
           </form>
@@ -184,4 +147,3 @@ export default function RegisterPage() {
     </main>
   );
 }
-
