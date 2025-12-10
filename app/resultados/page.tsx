@@ -63,6 +63,8 @@ export default function ResultadosPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [usdRate, setUsdRate] = useState(1);
+
   
   // Refs para evitar múltiples llamadas
   const fetchInitiated = useRef(false);
@@ -85,6 +87,12 @@ export default function ResultadosPage() {
     console.log(logMessage);
     setDebugLogs(prev => [...prev, logMessage]);
   };
+useEffect(() => {
+  fetch("https://api.exchangerate.host/latest?base=MXN&symbols=USD")
+    .then(res => res.json())
+    .then(data => setUsdRate(data.rates.USD))
+    .catch(() => setUsdRate(0.055)); // fallback aproximado
+}, []);
 
   useEffect(() => {
     // Evitar múltiples llamadas
@@ -255,14 +263,17 @@ export default function ResultadosPage() {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+const formatPrice = (price: number | string) => {
+  const num = typeof price === "string" ? parseInt(price) : price;
+  const precioConComision = num * 1.12;           // +12% comisión
+  const precioUSD = precioConComision * usdRate;  // convertir a USD
 
-  const formatPrice = (price: number | string) => {
-    const num = typeof price === "string" ? parseInt(price) : price;
-    return new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "MXN",
-    }).format(num);
-  };
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(precioUSD);
+};
+
 
   const renderStars = (estrellas: string) => {
     const num = parseInt(estrellas) || 0;

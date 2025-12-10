@@ -7,19 +7,112 @@ def parse_precio(texto: str) -> int:
     numeros = re.findall(r"\d+", texto.replace(",", "").replace(".", "").replace("$", "").replace("MXN", "").strip())
     return int("".join(numeros)) if numeros else 0
 
+def configurar_huespedes(page, habitaciones, adultos, ninos):
+    """Configura el número de huéspedes y habitaciones"""
+    try:
+        print(f"\n=== CONFIGURING GUESTS ===")
+        print(f"Rooms: {habitaciones}, Adults: {adultos}, Children: {ninos}")
+        
+        # Click en el input de huéspedes - usar el ID correcto
+        paxes_input = page.locator("input#packages_pax-value")
+        expect(paxes_input).to_be_visible(timeout=10000)
+        paxes_input.click()
+        time.sleep(1.5)
+        
+        # Esperar a que aparezca el modal de huéspedes
+        page.wait_for_selector("div.search-paxes.modal-active", timeout=10000)
+        time.sleep(1)
+        
+        # === HABITACIONES PRIMERO ===
+        # Primero configurar habitaciones si necesitamos más de una
+        if habitaciones > 1:
+            print(f"Adding {habitaciones - 1} additional room(s)...")
+            btn_add_room = page.locator("button.btnTertiary:has-text('Agregar habitación')")
+            for _ in range(habitaciones - 1):
+                if btn_add_room.count() > 0:
+                    btn_add_room.click()
+                    time.sleep(0.8)
+            print(f"✓ Total rooms: {habitaciones}")
+        
+        # === CONFIGURAR CADA HABITACIÓN ===
+        # Distribuir adultos y niños entre las habitaciones
+        adultos_por_hab = adultos // habitaciones
+        ninos_por_hab = ninos // habitaciones
+        adultos_restantes = adultos % habitaciones
+        ninos_restantes = ninos % habitaciones
+        
+        for hab_idx in range(habitaciones):
+            print(f"\nConfiguring Room {hab_idx + 1}...")
+            
+            # Calcular adultos y niños para esta habitación
+            adultos_esta_hab = adultos_por_hab + (1 if hab_idx < adultos_restantes else 0)
+            ninos_esta_hab = ninos_por_hab + (1 if hab_idx < ninos_restantes else 0)
+            
+            # Locator para esta habitación específica
+            room_container = page.locator(f"div.search-paxes .col-12.mobile-list").nth(hab_idx)
+            
+            # === ADULTOS ===
+            # Obtener el contador actual de adultos para esta habitación
+            adultos_counter = room_container.locator("div.row:has-text('Adultos') p.input-stepper-counter")
+            if adultos_counter.count() > 0:
+                adultos_actuales = int(adultos_counter.inner_text().strip())
+                print(f"  Current adults: {adultos_actuales}, target: {adultos_esta_hab}")
+                
+                if adultos_esta_hab > adultos_actuales:
+                    btn_add = room_container.locator("div.row:has-text('Adultos') button:has(i.icons-add)")
+                    for _ in range(adultos_esta_hab - adultos_actuales):
+                        btn_add.click()
+                        time.sleep(0.3)
+                elif adultos_esta_hab < adultos_actuales:
+                    btn_remove = room_container.locator("div.row:has-text('Adultos') button:has(i.icons-remove)")
+                    for _ in range(adultos_actuales - adultos_esta_hab):
+                        btn_remove.click()
+                        time.sleep(0.3)
+                
+                print(f"  ✓ Adults set to: {adultos_esta_hab}")
+            
+            # === NIÑOS ===
+            if ninos_esta_hab > 0:
+                ninos_counter = room_container.locator("div.row:has-text('Menores') p.input-stepper-counter")
+                if ninos_counter.count() > 0:
+                    ninos_actuales = int(ninos_counter.inner_text().strip())
+                    print(f"  Current children: {ninos_actuales}, target: {ninos_esta_hab}")
+                    
+                    btn_add = room_container.locator("div.row:has-text('Menores') button:has(i.icons-add)")
+                    for _ in range(ninos_esta_hab - ninos_actuales):
+                        btn_add.click()
+                        time.sleep(0.5)
+                    
+                    print(f"  ✓ Children set to: {ninos_esta_hab}")
+        
+        # Aplicar cambios
+        print("\nApplying guest configuration...")
+        btn_aplicar = page.locator("button.btnPrimary:has-text('Aplicar')")
+        btn_aplicar.click()
+        time.sleep(2)
+        
+        print("✓ Guest configuration applied successfully")
+        return True
+        
+    except Exception as e:
+        print(f"ERROR configuring guests: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def extraer_vuelo_recomendado(page):
     """Extrae información del vuelo recomendado (ida y regreso)"""
     vuelos = {"ida": {}, "regreso": {}}
-
-    time.sleep(30)   # ⏳ Espera fija de 30 segundos
+    
+    time.sleep(8)
     
     try:
-        print("\nDEBUG: Extrayendo información de vuelos...")
+        print("\nDEBUG: Extracting flight information...")
         
         vuelo_container = page.locator("div.c-box-air")
         
         if vuelo_container.count() == 0:
-            print("ADVERTENCIA: No se encontró contenedor de vuelos")
+            print("WARNING: Flight container not found")
             return vuelos
         
         # VUELO DE IDA
@@ -50,9 +143,9 @@ def extraer_vuelo_recomendado(page):
                 if hora_llegada.count() > 0:
                     vuelos["ida"]["hora_llegada"] = hora_llegada.inner_text().strip()
                 
-                print(f"DEBUG: Vuelo IDA - {vuelos['ida'].get('origen', 'N/A')} -> {vuelos['ida'].get('destino', 'N/A')}")
+                print(f"DEBUG: Outbound Flight - {vuelos['ida'].get('origen', 'N/A')} -> {vuelos['ida'].get('destino', 'N/A')}")
             except Exception as e:
-                print(f"Error extrayendo vuelo de ida: {e}")
+                print(f"Error extracting outbound flight: {e}")
         
         # VUELO DE REGRESO
         regreso_container = page.locator("div.c-block-01").nth(1)
@@ -82,12 +175,12 @@ def extraer_vuelo_recomendado(page):
                 if hora_llegada.count() > 0:
                     vuelos["regreso"]["hora_llegada"] = hora_llegada.inner_text().strip()
                 
-                print(f"DEBUG: Vuelo REGRESO - {vuelos['regreso'].get('origen', 'N/A')} -> {vuelos['regreso'].get('destino', 'N/A')}")
+                print(f"DEBUG: Return Flight - {vuelos['regreso'].get('origen', 'N/A')} -> {vuelos['regreso'].get('destino', 'N/A')}")
             except Exception as e:
-                print(f"Error extrayendo vuelo de regreso: {e}")
+                print(f"Error extracting return flight: {e}")
     
     except Exception as e:
-        print(f"Error general extrayendo vuelos: {e}")
+        print(f"General error extracting flights: {e}")
     
     return vuelos
 
@@ -96,14 +189,14 @@ def extraer_paquetes(page):
     resultados = []
     
     try:
-        print("\nDEBUG: Extrayendo paquetes...")
+        print("\nDEBUG: Extracting packages...")
         
         page.wait_for_selector("div.pth-card", timeout=30000)
         time.sleep(2)
         
         paquetes = page.locator("div.pth-card")
         total = paquetes.count()
-        print(f"DEBUG: Total de paquetes encontrados: {total}")
+        print(f"DEBUG: Total packages found: {total}")
         
         for i in range(min(total, 10)):
             try:
@@ -136,7 +229,7 @@ def extraer_paquetes(page):
                 if opiniones_selector.count() > 0:
                     opiniones = opiniones_selector.inner_text().strip()
                 
-                plan_alimentos = "Sin alimentos"
+                plan_alimentos = "No meals included"
                 plan_selector = paquete.locator("div.card-mealplan")
                 if plan_selector.count() > 0:
                     plan_alimentos = plan_selector.inner_text().strip()
@@ -190,145 +283,184 @@ def extraer_paquetes(page):
                 }
                 
                 resultados.append(paquete_data)
-                print(f"DEBUG: Paquete {i+1}/10 - {nombre} - ${precio_persona:,} MXN")
+                print(f"DEBUG: Package {i+1}/10 - {nombre} - ${precio_persona:,} MXN")
                 
             except Exception as e:
-                print(f"Error procesando paquete {i+1}: {e}")
+                print(f"Error processing package {i+1}: {e}")
                 continue
     
     except Exception as e:
-        print(f"Error extrayendo paquetes: {e}")
+        print(f"Error extracting packages: {e}")
     
     return resultados
 
 def seleccionar_fecha_easepick(page, fecha_objetivo, es_fecha_vuelta=False):
-    """Selecciona una fecha en el calendario easepick de PriceTravel usando data-time"""
+    """Selecciona una fecha en el calendario easepick usando data-time dentro de Shadow DOM"""
     try:
         fecha_obj = datetime.strptime(fecha_objetivo, "%Y-%m-%d")
-        timestamp_objetivo = int(fecha_obj.timestamp() * 1000)  # Convertir a milisegundos
+        timestamp_objetivo = int(fecha_obj.timestamp() * 1000)
         
         mes_objetivo = fecha_obj.month
         año_objetivo = fecha_obj.year
         dia_objetivo = fecha_obj.day
         
-        meses_es = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
-                    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        # Nombres de meses en inglés (lowercase para comparación)
+        meses_en = ["january", "february", "march", "april", "may", "june",
+                    "july", "august", "september", "october", "november", "december"]
         
-        print(f"\nDEBUG: {'VUELTA' if es_fecha_vuelta else 'IDA'} - Buscando {dia_objetivo} de {meses_es[mes_objetivo-1]} {año_objetivo}")
-        print(f"DEBUG: Timestamp objetivo: {timestamp_objetivo}")
+        print(f"\n{'='*60}")
+        print(f"SEARCHING {'RETURN' if es_fecha_vuelta else 'DEPARTURE'} DATE")
+        print(f"{'='*60}")
+        print(f"Target: {dia_objetivo} {meses_en[mes_objetivo-1].capitalize()} {año_objetivo}")
+        print(f"Timestamp: {timestamp_objetivo}")
+        
+        # Acceder al Shadow DOM del calendario
+        shadow_host = page.locator("span.easepick-wrapper")
         
         max_intentos = 24
         intentos = 0
         
         while intentos < max_intentos:
-            # Buscar AMBOS meses visibles en el calendario
-            month_headers = page.locator(".month-name span")
+            time.sleep(1)
             
-            if month_headers.count() >= 1:
-                # El calendario muestra 2 meses a la vez
-                meses_visibles = []
-                años_visibles = []
-                
-                for i in range(min(2, month_headers.count())):
-                    mes_text = month_headers.nth(i).inner_text().strip()
-                    # Extraer mes y año del texto "diciembre 2025" o "enero 2026"
-                    partes = mes_text.lower().split()
-                    if len(partes) >= 2:
-                        nombre_mes = partes[0]
-                        año = int(partes[1])
-                        meses_visibles.append(nombre_mes)
-                        años_visibles.append(año)
-                    else:
-                        meses_visibles.append(partes[0] if partes else "")
-                        años_visibles.append(None)
-                
-                print(f"DEBUG: Meses visibles: {list(zip(meses_visibles, años_visibles))}")
-                
-                # Verificar si nuestro mes Y AÑO objetivo están visibles
-                mes_objetivo_nombre = meses_es[mes_objetivo - 1]
-                mes_encontrado = False
-                indice_calendario = -1
-                
-                for i, (mes_visible, año_visible) in enumerate(zip(meses_visibles, años_visibles)):
-                    # Comparar MES Y AÑO
-                    if mes_objetivo_nombre in mes_visible and (año_visible is None or año_visible == año_objetivo):
-                        mes_encontrado = True
-                        indice_calendario = i
-                        print(f"DEBUG: ✓ Mes y año objetivo '{mes_objetivo_nombre} {año_objetivo}' encontrado en calendario {i+1}")
-                        break
-                
-                if mes_encontrado:
-                    # Ahora buscar el día específico usando data-time
-                    time.sleep(0.8)
+            # Evaluar dentro del Shadow DOM usando JavaScript
+            calendars_info = page.evaluate("""
+                () => {
+                    const shadowHost = document.querySelector('span.easepick-wrapper');
+                    if (!shadowHost || !shadowHost.shadowRoot) return null;
                     
-                    # Buscar en el calendario correcto (primero o segundo)
-                    calendars = page.locator(".calendar")
-                    if calendars.count() > indice_calendario:
-                        calendario_correcto = calendars.nth(indice_calendario)
-                        dias = calendario_correcto.locator(".day.unit:not(.not-available)")
-                        print(f"DEBUG: {dias.count()} días disponibles en calendario {indice_calendario + 1}")
-                        
-                        # Buscar el día por timestamp
-                        dia_encontrado = False
-                        
-                        for i in range(dias.count()):
-                            dia = dias.nth(i)
-                            data_time = dia.get_attribute("data-time")
-                            texto_dia = dia.inner_text().strip()
-                            
-                            if data_time:
-                                dia_timestamp = int(data_time)
-                                # Comparar timestamps con margen de 12 horas (43200000 ms)
-                                diferencia = abs(dia_timestamp - timestamp_objetivo)
-                                
-                                if diferencia < 43200000:  # Menos de 12 horas de diferencia
-                                    print(f"DEBUG: ✓ Día encontrado: {texto_dia} (timestamp: {data_time})")
-                                    print(f"DEBUG: Diferencia de timestamp: {diferencia}ms")
-                                    dia.click()
-                                    time.sleep(1.5)
-                                    dia_encontrado = True
-                                    return True
-                        
-                        if not dia_encontrado:
-                            print(f"ADVERTENCIA: Día {dia_objetivo} no encontrado en el calendario correcto")
-                    else:
-                        print(f"ERROR: No se pudo acceder al calendario {indice_calendario + 1}")
-                else:
-                    print(f"DEBUG: Mes '{mes_objetivo_nombre} {año_objetivo}' no visible aún, avanzando...")
+                    const calendars = shadowHost.shadowRoot.querySelectorAll('div.calendar');
+                    const result = [];
+                    
+                    calendars.forEach((cal, idx) => {
+                        const monthNameDiv = cal.querySelector('.month-name');
+                        if (monthNameDiv) {
+                            // El texto completo incluye el mes dentro del <span> y el año como texto suelto
+                            const fullText = monthNameDiv.textContent.trim();
+                            result.push({
+                                index: idx,
+                                header: fullText
+                            });
+                        }
+                    });
+                    
+                    return result;
+                }
+            """)
+            
+            if not calendars_info:
+                print(f"Attempt {intentos + 1}/{max_intentos} - Shadow DOM not ready")
+                intentos += 1
+                continue
+            
+            print(f"\nAttempt {intentos + 1}/{max_intentos} - Found {len(calendars_info)} calendars")
+            
+            # Buscar en cada calendario
+            found = False
+            for cal_info in calendars_info:
+                cal_idx = cal_info['index']
+                header_text = cal_info['header']
                 
-                # Avanzar al siguiente mes
-                next_button = page.locator("button.next-button.unit").last
-                if next_button.count() > 0:
-                    print(f"DEBUG: Click en botón 'siguiente mes' (intento {intentos + 1})")
-                    next_button.click()
-                    time.sleep(1.2)  # Esperar a que se cargue el siguiente mes
-                else:
-                    print("ERROR: No se encontró botón 'siguiente mes'")
+                print(f"  Calendar {cal_idx + 1}: '{header_text}'")
+                
+                # Parse el header "January 2028" o "February 2028"
+                partes = header_text.lower().split()
+                if len(partes) < 2:
+                    continue
+                
+                mes_nombre = partes[0].strip()
+                try:
+                    año_calendario = int(partes[1].strip())
+                except ValueError:
+                    continue
+                
+                # Verificar si este calendario tiene el mes/año objetivo
+                mes_objetivo_nombre = meses_en[mes_objetivo - 1]
+                
+                if mes_nombre == mes_objetivo_nombre and año_calendario == año_objetivo:
+                    print(f"  ✓ MATCH FOUND in Calendar {cal_idx + 1}")
+                    
+                    # Buscar el día específico dentro del Shadow DOM
+                    day_clicked = page.evaluate(f"""
+                        (timestamp) => {{
+                            const shadowHost = document.querySelector('span.easepick-wrapper');
+                            if (!shadowHost || !shadowHost.shadowRoot) return false;
+                            
+                            const calendars = shadowHost.shadowRoot.querySelectorAll('div.calendar');
+                            const calendar = calendars[{cal_idx}];
+                            if (!calendar) return false;
+                            
+                            const days = calendar.querySelectorAll('div.day.unit:not(.not-available)');
+                            
+                            for (let day of days) {{
+                                const dataTime = day.getAttribute('data-time');
+                                if (dataTime) {{
+                                    const dayTimestamp = parseInt(dataTime);
+                                    const diff = Math.abs(dayTimestamp - timestamp);
+                                    const diffHours = diff / (1000 * 60 * 60);
+                                    
+                                    if (diffHours < 12) {{
+                                        console.log('Clicking day:', day.textContent.trim());
+                                        day.click();
+                                        return true;
+                                    }}
+                                }}
+                            }}
+                            
+                            return false;
+                        }}
+                    """, timestamp_objetivo)
+                    
+                    if day_clicked:
+                        print(f"  ✓ DAY CLICKED successfully")
+                        time.sleep(1.5)
+                        return True
+                    else:
+                        print(f"  ✗ Day {dia_objetivo} not found in this calendar")
+            
+            # Si no encontramos el mes/año, avanzar
+            if not found:
+                print("  → Moving to next month...")
+                
+                # Click en el botón "next" dentro del Shadow DOM
+                next_clicked = page.evaluate("""
+                    () => {
+                        const shadowHost = document.querySelector('span.easepick-wrapper');
+                        if (!shadowHost || !shadowHost.shadowRoot) return false;
+                        
+                        const nextButtons = shadowHost.shadowRoot.querySelectorAll('button.next-button.unit');
+                        if (nextButtons.length > 0) {
+                            nextButtons[nextButtons.length - 1].click();
+                            return true;
+                        }
+                        return false;
+                    }
+                """)
+                
+                if not next_clicked:
+                    print("  ✗ Next button not found")
                     return False
-            else:
-                print("ERROR: No se encontró header del calendario")
-                return False
+                
+                time.sleep(1)
             
             intentos += 1
         
-        print(f"ERROR: No se pudo seleccionar fecha después de {max_intentos} intentos")
+        print(f"\n✗ Could not find date after {max_intentos} attempts")
         return False
         
     except Exception as e:
-        print(f"ERROR en seleccionar_fecha_easepick: {e}")
+        print(f"\n✗ ERROR: {e}")
         import traceback
         traceback.print_exc()
         return False
 
-def run(origen, destino, fecha_ida, fecha_vuelta, tipo, perfil="Default"):
+def run(origen, destino, fecha_ida, fecha_vuelta, habitaciones, adultos, ninos, perfil="Default"):
     with sync_playwright() as p:
         proxy_server = os.environ.get("HTTP_PROXY")
         proxy_config = {"server": proxy_server} if proxy_server else None
 
         perfil_path = f"/home/KALI/.config/microsoft-edge/{perfil}"
-        print(f"Usando perfil de Edge: {perfil_path}")
-        if proxy_server:
-            print(f"Con proxy: {proxy_server}")
+        print(f"Using Edge profile: {perfil_path}")
 
         browser = p.chromium.launch_persistent_context(
             user_data_dir=perfil_path,
@@ -342,15 +474,56 @@ def run(origen, destino, fecha_ida, fecha_vuelta, tipo, perfil="Default"):
 
         try:
             print("=" * 60)
-            print("DEBUG: Iniciando búsqueda en PriceTravel")
+            print("STARTING PRICETRAVEL SEARCH")
             print("=" * 60)
             
-            print("DEBUG: Cargando página de paquetes...")
             page.goto("https://www.pricetravel.com/es/paquetes", wait_until="domcontentloaded")
             time.sleep(3)
 
+            # === CAMBIAR IDIOMA A INGLÉS ===
+            print("\n=== CHANGING LANGUAGE TO ENGLISH ===")
+            try:
+                # Click en el botón de idioma (puede ser Español o el selector de idioma)
+                lang_button = page.locator("button.header__btn:has-text('Español'), button.header__btn:has-text('ES')")
+                if lang_button.count() > 0:
+                    lang_button.first.click()
+                    time.sleep(1.5)
+                    
+                    # Click en el label específico para inglés
+                    english_label = page.locator("label[for='https://www.pricetravel.com/en/packages']")
+                    if english_label.count() > 0:
+                        english_label.click()
+                        time.sleep(1)
+                        print("✓ English language option selected")
+                        
+                        # Click en el botón Aplicar
+                        apply_button = page.locator("button.btnPrimary.w-100:has-text('Aplicar')")
+                        if apply_button.count() > 0:
+                            apply_button.click()
+                            time.sleep(4)  # Esperar 4 segundos después de aplicar el cambio
+                            print("✓ Language change applied successfully")
+                        else:
+                            print("⚠ Apply button not found")
+                    else:
+                        print("⚠ English label not found, trying alternative method")
+                        # Método alternativo: buscar directamente el input radio
+                        english_radio = page.locator("input[value='https://www.pricetravel.com/en/packages']")
+                        if english_radio.count() > 0:
+                            english_radio.click()
+                            time.sleep(1)
+                            apply_button = page.locator("button.btnPrimary.w-100:has-text('Aplicar')")
+                            if apply_button.count() > 0:
+                                apply_button.click()
+                                time.sleep(4)  # Esperar 4 segundos después de aplicar el cambio
+                                print("✓ Language changed via alternative method")
+                else:
+                    print("⚠ Language button not found, continuing in current language")
+            except Exception as e:
+                print(f"⚠ Could not change language: {e}")
+                print("Continuing with current language...")
+
             # === ORIGEN ===
-            print(f"\nDEBUG: === CONFIGURANDO ORIGEN: {origen} ===")
+            print(f"\n=== ORIGIN: {origen} ===")
             origen_input = page.locator("input#place_name_package")
             expect(origen_input).to_be_visible(timeout=10000)
             
@@ -360,23 +533,21 @@ def run(origen, destino, fecha_ida, fecha_vuelta, tipo, perfil="Default"):
             time.sleep(0.3)
             origen_input.type(origen, delay=150)
             
-            print("DEBUG: Esperando sugerencias de origen...")
             page.wait_for_selector("button.list-group-item-action:visible", timeout=15000)
             time.sleep(1.5)
             
             sugerencias = page.locator("button.list-group-item-action:visible")
             if sugerencias.count() > 0:
-                print(f"DEBUG: {sugerencias.count()} sugerencias encontradas")
                 sugerencias.first.click()
-                print("DEBUG: ✓ Origen seleccionado")
+                print("✓ Origin selected")
             else:
-                print("ERROR: No se encontraron sugerencias de origen")
+                print("✗ No suggestions found")
                 return
             
             time.sleep(1)
 
             # === DESTINO ===
-            print(f"\nDEBUG: === CONFIGURANDO DESTINO: {destino} ===")
+            print(f"\n=== DESTINATION: {destino} ===")
             destino_input = page.locator("input#place_name_package_to")
             expect(destino_input).to_be_visible(timeout=10000)
             
@@ -386,78 +557,76 @@ def run(origen, destino, fecha_ida, fecha_vuelta, tipo, perfil="Default"):
             time.sleep(0.3)
             destino_input.type(destino, delay=150)
             
-            print("DEBUG: Esperando sugerencias de destino...")
             page.wait_for_selector("button.list-group-item-action:visible", timeout=15000)
             time.sleep(1.5)
             
             sugerencias_destino = page.locator("button.list-group-item-action:visible")
             if sugerencias_destino.count() > 0:
-                print(f"DEBUG: {sugerencias_destino.count()} sugerencias encontradas")
                 sugerencias_destino.first.click()
-                print("DEBUG: ✓ Destino seleccionado")
+                print("✓ Destination selected")
             else:
-                print("ERROR: No se encontraron sugerencias de destino")
+                print("✗ No suggestions found")
                 return
             
             time.sleep(1)
 
             # === FECHAS ===
-            print(f"\nDEBUG: === CONFIGURANDO FECHAS ===")
-            print(f"Ida: {fecha_ida} | Vuelta: {fecha_vuelta}")
+            print(f"\n=== DATES ===")
+            print(f"Departure: {fecha_ida}")
+            print(f"Return: {fecha_vuelta}")
             
-            # Abrir calendario
             fecha_input = page.locator("input#calendar-checkIn-package")
             expect(fecha_input).to_be_visible(timeout=10000)
             fecha_input.click()
             
-            print("DEBUG: Esperando calendario easepick...")
-            page.wait_for_selector(".easepick-wrapper .container", timeout=15000)
-            time.sleep(2)
+            # Esperar a que aparezca el shadow root del calendario
+            print("DEBUG: Waiting for shadow root calendar...")
+            time.sleep(3)
             
-            # Seleccionar fecha de IDA
-            print(f"\nDEBUG: === SELECCIONANDO FECHA DE IDA ===")
             if not seleccionar_fecha_easepick(page, fecha_ida, es_fecha_vuelta=False):
-                print("ERROR: No se pudo seleccionar fecha de ida")
-                page.screenshot(path="error_fecha_ida.png", full_page=True)
+                print("✗ Could not select departure date")
+                page.screenshot(path="error_departure.png")
                 return
             
-            print(f"DEBUG: ✓ Fecha de ida seleccionada: {fecha_ida}")
+            print("✓ Departure date selected")
             time.sleep(1)
             
-            # Seleccionar fecha de VUELTA
-            print(f"\nDEBUG: === SELECCIONANDO FECHA DE VUELTA ===")
             if not seleccionar_fecha_easepick(page, fecha_vuelta, es_fecha_vuelta=True):
-                print("ERROR: No se pudo seleccionar fecha de vuelta")
-                page.screenshot(path="error_fecha_vuelta.png", full_page=True)
+                print("✗ Could not select return date")
+                page.screenshot(path="error_return.png")
                 return
             
-            print(f"DEBUG: ✓ Fecha de vuelta seleccionada: {fecha_vuelta}")
+            print("✓ Return date selected")
             time.sleep(1.5)
 
+            # === HUÉSPEDES ===
+            if not configurar_huespedes(page, habitaciones, adultos, ninos):
+                print("✗ Could not configure guests")
+                return
+
             # === BUSCAR ===
-            print("\nDEBUG: === EJECUTANDO BÚSQUEDA ===")
-            buscar_btn = page.locator("button.btnPrimary:has-text('Buscar'), button.btnPrimary:has-text('BUSCAR')")
+            print("\n=== SEARCH ===")
+            buscar_btn = page.locator("button.btnPrimary:has-text('Buscar'), button.btnPrimary:has-text('BUSCAR'), button.btnPrimary:has-text('Search'), button.btnPrimary:has-text('SEARCH')")
             
             if buscar_btn.count() > 0:
-                print("DEBUG: Haciendo clic en botón Buscar...")
                 buscar_btn.first.click()
             else:
-                print("ERROR: No se encontró el botón de búsqueda")
+                print("✗ Search button not found")
                 return
 
             # === ESPERAR RESULTADOS ===
-            print("\nDEBUG: === ESPERANDO RESULTADOS ===")
+            print("\n=== WAITING FOR RESULTS ===")
             page.wait_for_load_state("domcontentloaded", timeout=60000)
-            time.sleep(5)
             
-            print(f"DEBUG: URL actual: {page.url}")
+            # ESPERAR 13 SEGUNDOS para que cargue toda la información
+            print("Waiting 13 seconds for all data to load...")
+            time.sleep(13)
             
-            page.screenshot(path="pricetravel_resultados.png", full_page=True)
-            print("DEBUG: Screenshot guardado en: pricetravel_resultados.png")
+            print(f"Current URL: {page.url}")
             
             # === EXTRAER DATOS ===
             print("\n" + "=" * 60)
-            print("=== EXTRAYENDO INFORMACIÓN ===")
+            print("EXTRACTING DATA")
             print("=" * 60)
             
             vuelos = extraer_vuelo_recomendado(page)
@@ -468,17 +637,15 @@ def run(origen, destino, fecha_ida, fecha_vuelta, tipo, perfil="Default"):
                     "origen": origen,
                     "destino": destino,
                     "fecha_ida": fecha_ida,
-                    "fecha_vuelta": fecha_vuelta
+                    "fecha_vuelta": fecha_vuelta,
+                    "habitaciones": habitaciones,
+                    "adultos": adultos,
+                    "ninos": ninos
                 },
                 "vuelos": vuelos,
                 "paquetes": paquetes,
                 "total_encontrados": len(paquetes)
             }
-            
-            print("\n" + "=" * 60)
-            print("=== RESULTADOS FINALES ===")
-            print("=" * 60)
-            print(json.dumps(resultado_final, ensure_ascii=False, indent=2))
             
             if os.environ.get("OUTPUT_MODE") == "api":
                 print("\n__JSON_START__")
@@ -486,35 +653,37 @@ def run(origen, destino, fecha_ida, fecha_vuelta, tipo, perfil="Default"):
                 print("__JSON_END__")
             else:
                 print("\n" + "=" * 60)
-                input("Presiona ENTER para cerrar el navegador...")
+                print("FINAL RESULTS")
+                print("=" * 60)
+                print(json.dumps(resultado_final, ensure_ascii=False, indent=2))
+                input("Press ENTER to close browser...")
 
         except Exception as e:
-            print(f"\n❌ ERROR CRÍTICO: {e}")
+            print(f"\n✗ CRITICAL ERROR: {e}")
             import traceback
             traceback.print_exc()
-            
             page.screenshot(path="pricetravel_error.png", full_page=True)
-            print("Screenshot de error guardado: pricetravel_error.png")
 
         finally:
             browser.close()
 
 if __name__ == "__main__":
-    if len(sys.argv) < 6:
+    if len(sys.argv) < 8:
         print("=" * 60)
-        print("Uso: python pricetravel_worker.py <origen> <destino> <fecha_ida> <fecha_vuelta> <tipo> [perfil]")
+        print("Usage: python playwright_worker_price.py <origin> <destination> <departure> <return> <rooms> <adults> <children> [profile]")
         print("=" * 60)
-        print("\nEjemplo:")
-        print('  python pricetravel_worker.py "Londres" "Cancún" "2025-12-25" "2025-12-30" "PAQUETE"')
-        print("\nFormato de fechas: YYYY-MM-DD")
-        print("=" * 60)
+        print("\nExample:")
+        print('  python playwright_worker_price.py "Sydney" "Mexico City" "2025-12-24" "2025-12-29" 1 2 0')
+        print("\nDate format: YYYY-MM-DD")
         sys.exit(1)
     
     origen = sys.argv[1]
     destino = sys.argv[2]
     fecha_ida = sys.argv[3]
     fecha_vuelta = sys.argv[4]
-    tipo = sys.argv[5]
-    perfil = sys.argv[6] if len(sys.argv) > 6 else "Default"
+    habitaciones = int(sys.argv[5])
+    adultos = int(sys.argv[6])
+    ninos = int(sys.argv[7])
+    perfil = sys.argv[8] if len(sys.argv) > 8 else "Default"
     
-    run(origen, destino, fecha_ida, fecha_vuelta, tipo, perfil)
+    run(origen, destino, fecha_ida, fecha_vuelta, habitaciones, adultos, ninos, perfil)

@@ -6,16 +6,16 @@ import { useRouter } from "next/navigation";
 type Airport = { name: string; city: string; code: string };
 
 const airportsOrigin: Airport[] = [
-  { name: "London Heathrow Airport", city: "Londres", code: "LHR" },
-  { name: "London Gatwick Airport", city: "Londres", code: "LGW" },
+  { name: "London Heathrow Airport", city: "London", code: "LHR" },
+  { name: "London Gatwick Airport", city: "London", code: "LGW" },
   { name: "Toronto Pearson International Airport", city: "Toronto", code: "YYZ" },
   { name: "Montreal Pierre Elliott Trudeau International Airport", city: "Montreal", code: "YUL" },
   { name: "Sydney Kingsford Smith International Airport", city: "Sydney", code: "SYD" },
 ];
 
 const airportsDestination: Airport[] = [
-  { name: "Cancun International Airport", city: "Cancún", code: "CUN" },
-  { name: "Mexico City International Airport", city: "Ciudad de México", code: "MEX" },
+  { name: "Cancun International Airport", city: "Cancun", code: "CUN" },
+  { name: "Mexico City International Airport", city: "Mexico City", code: "MEX" },
   { name: "Oaxaca International Airport", city: "Oaxaca", code: "OAX" },
   { name: "Guadalajara International Airport", city: "Guadalajara", code: "GDL" },
   { name: "Los Cabos International Airport", city: "Los Cabos", code: "SJD" },
@@ -92,23 +92,23 @@ export default function CotizadorBanner() {
   const totalChildren = rooms.reduce((sum, room) => sum + room.children, 0);
 
   const getRoomsText = () => {
-    return `${rooms.length} hab, ${totalAdults} adult${totalAdults > 1 ? 's' : ''}, ${totalChildren} niño${totalChildren !== 1 ? 's' : ''}`;
+    return `${rooms.length} room${rooms.length > 1 ? 's' : ''}, ${totalAdults} adult${totalAdults > 1 ? 's' : ''}, ${totalChildren} child${totalChildren !== 1 ? 'ren' : ''}`;
   };
 
   const handleQuote = () => {
-    // Validaciones
+    // Validations
     if (!origin || !destination) {
-      alert("Por favor selecciona origen y destino");
+      alert("Please select origin and destination");
       return;
     }
 
     if (tab === "flightHotel" && (!departureDate || !returnDate)) {
-      alert("Por favor selecciona fechas de ida y vuelta");
+      alert("Please select departure and return dates");
       return;
     }
 
     if (tab === "flightHotelTour" && !tourMonth) {
-      alert("Por favor selecciona un mes para el tour");
+      alert("Please select a month for the tour");
       return;
     }
 
@@ -122,11 +122,11 @@ export default function CotizadorBanner() {
       adults: totalAdults,
       children: totalChildren,
       roomDetails: rooms,
-      packageType: tab === "flightHotel" ? "PAQUETE" : "PAQUETE+TOUR",
+      packageType: tab === "flightHotel" ? "PACKAGE" : "PACKAGE+TOUR",
       timestamp: new Date().toISOString(),
     };
 
-    console.log("Payload enviado:", payload);
+    console.log("Payload sent:", payload);
     localStorage.setItem("lastQuote", JSON.stringify(payload));
     router.push("/resultados");
   };
@@ -157,7 +157,7 @@ export default function CotizadorBanner() {
         </button>
       </div>
 
-      {/* Form - Todo en una línea */}
+      {/* Form - Everything in one line */}
       <div className="flex items-end gap-3">
         {/* Origin */}
         <div className="flex flex-col relative flex-1 z-50">
@@ -366,7 +366,9 @@ export default function CotizadorBanner() {
                       
                       <div className="space-y-3">
                         <div>
-                          <label className="text-sm text-gray-600 block mb-1">Adults</label>
+                          <label className="text-sm text-gray-600 block mb-1">
+                            Adults <span className="text-xs">(12+ years)</span>
+                          </label>
                           <select
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                             value={room.adults}
@@ -381,7 +383,9 @@ export default function CotizadorBanner() {
                         </div>
 
                         <div>
-                          <label className="text-sm text-gray-600 block mb-1">Children (under 12)</label>
+                          <label className="text-sm text-gray-600 block mb-1">
+                            Children <span className="text-xs">(under 12)</span>
+                          </label>
                           <select
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                             value={room.children}
