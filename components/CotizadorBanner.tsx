@@ -17,9 +17,10 @@ const airportsDestination: Airport[] = [
   { name: "Cancun International Airport", city: "Cancun", code: "CUN" },
   { name: "Mexico City International Airport", city: "Mexico City", code: "MEX" },
   { name: "Oaxaca International Airport", city: "Oaxaca", code: "OAX" },
-  { name: "Guadalajara International Airport", city: "Guadalajara", code: "GDL" },
+  { name: "Manuel Crescencio Rejón International Airport", city: "Yucatan", code: "MID" },
   { name: "Los Cabos International Airport", city: "Los Cabos", code: "SJD" },
 ];
+
 
 const months = [
   "January","February","March","April","May","June",
@@ -37,6 +38,7 @@ export default function CotizadorBanner() {
   const [destinationDisplay, setDestinationDisplay] = useState("");
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
+  const [destinationType, setDestinationType] = useState(""); // Nuevo estado para el tipo
 
   const [departureDate, setDepartureDate] = useState("");
   const [returnDate, setReturnDate] = useState("");
@@ -95,6 +97,20 @@ export default function CotizadorBanner() {
     return `${rooms.length} room${rooms.length > 1 ? 's' : ''}, ${totalAdults} adult${totalAdults > 1 ? 's' : ''}, ${totalChildren} child${totalChildren !== 1 ? 'ren' : ''}`;
   };
 
+  const handleDestinationSelect = (airport: Airport) => {
+    setDestination(airport.city);
+    setDestinationDisplay(`${airport.city} (${airport.code})`);
+    
+    // Si es CDMX (MEX), usar "reforma", de lo contrario usar el código
+    if (airport.code === "MEX") {
+      setDestinationType("reforma");
+    } else {
+      setDestinationType(airport.code);
+    }
+    
+    setShowDestinationSuggestions(false);
+  };
+
   const handleQuote = () => {
     // Validations
     if (!origin || !destination) {
@@ -115,6 +131,7 @@ export default function CotizadorBanner() {
     const payload = {
       origin,
       destination,
+      destinationType, // Incluir el tipo de destino
       departureDate: tab === "flightHotel" ? departureDate : "",
       returnDate: tab === "flightHotel" ? returnDate : "",
       tourMonth: tab === "flightHotelTour" ? tourMonth : "",
@@ -240,9 +257,7 @@ export default function CotizadorBanner() {
                   e.preventDefault();
                 } else if (e.key === "Enter" && activeDestinationIndex >= 0) {
                   const selected = destinationSuggestions[activeDestinationIndex];
-                  setDestination(selected.city);
-                  setDestinationDisplay(`${selected.city} (${selected.code})`);
-                  setShowDestinationSuggestions(false);
+                  handleDestinationSelect(selected);
                   e.preventDefault();
                 }
               }}
@@ -256,11 +271,7 @@ export default function CotizadorBanner() {
                   className={`px-4 py-3 cursor-pointer border-b last:border-b-0 ${
                     index === activeDestinationIndex ? "bg-blue-50" : "hover:bg-gray-50"
                   }`}
-                  onMouseDown={() => {
-                    setDestination(a.city);
-                    setDestinationDisplay(`${a.city} (${a.code})`);
-                    setShowDestinationSuggestions(false);
-                  }}
+                  onMouseDown={() => handleDestinationSelect(a)}
                 >
                   <div className="font-semibold text-sm">{a.city}</div>
                   <div className="text-xs text-gray-600">{a.name}</div>

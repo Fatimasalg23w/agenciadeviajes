@@ -474,7 +474,7 @@ const formatPrice = (price: number | string) => {
       <div className="bg-[#556B2F] text-white py-6 px-4 shadow-lg">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl font-bold mb-4">
-            Resultados: {resultados.busqueda.origen} → {resultados.busqueda.destino}
+            Results: {resultados.busqueda.origen} → {resultados.busqueda.destino}
           </h1>
           <div className="flex flex-wrap gap-6 text-sm">
             <div className="flex items-center gap-2">
@@ -488,14 +488,14 @@ const formatPrice = (price: number | string) => {
               <div className="flex items-center gap-2">
                 <UserGroupIcon className="h-5 w-5" />
                 <span>
-                  {resultados.request_info.adults} adultos, {resultados.request_info.children} niños, {" "}
-                  {resultados.request_info.rooms} habitación(es)
+                  {resultados.request_info.adults} adults, {resultados.request_info.children} child(ren), {" "}
+                  {resultados.request_info.rooms} room(s)
                 </span>
               </div>
             )}
             <div className="flex items-center gap-2">
               <BuildingOfficeIcon className="h-5 w-5" />
-              <span>{resultados.total_encontrados} paquetes encontrados</span>
+              <span>{resultados.total_encontrados} options for you:</span>
             </div>
           </div>
         </div>
@@ -503,10 +503,10 @@ const formatPrice = (price: number | string) => {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4 text-gray-800">✈️ Vuelo Recomendado</h2>
+          <h2 className="text-xl font-bold mb-4 text-gray-800">✈️ Recommended Cheapest Flight</h2>
           <div className="grid md:grid-cols-2 gap-6">
             <div className="border-l-4 border-blue-500 pl-4">
-              <h3 className="font-semibold text-gray-700 mb-2">Ida</h3>
+              <h3 className="font-semibold text-gray-700 mb-2">Origin</h3>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-2xl font-bold text-gray-800">
@@ -531,7 +531,7 @@ const formatPrice = (price: number | string) => {
             </div>
 
             <div className="border-l-4 border-green-500 pl-4">
-              <h3 className="font-semibold text-gray-700 mb-2">Regreso</h3>
+              <h3 className="font-semibold text-gray-700 mb-2">Destination</h3>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-2xl font-bold text-gray-800">
@@ -557,7 +557,7 @@ const formatPrice = (price: number | string) => {
           </div>
         </div>
 
-        <h2 className="text-2xl font-bold mb-4 text-gray-800">🏨 Paquetes Disponibles</h2>
+        <h2 className="text-2xl font-bold mb-4 text-gray-800">🏨 Select your accommodation </h2>
         <div className="grid gap-6">
           {resultados.paquetes.map((paquete, index) => (
             <div key={index} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow">
@@ -615,7 +615,7 @@ const formatPrice = (price: number | string) => {
                           {formatPrice(paquete.precio_original)}
                         </div>
                       )}
-                      <div className="text-sm text-gray-600">Por persona</div>
+                      <div className="text-sm text-gray-600">Per person</div>
                       <div className="text-3xl font-bold text-[#556B2F]">
                         {formatPrice(paquete.precio_persona)}
                       </div>
@@ -629,7 +629,7 @@ const formatPrice = (price: number | string) => {
                       rel="noopener noreferrer"
                       className="bg-[#556B2F] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#445522] transition-colors"
                     >
-                      Ver detalles
+                      More details
                     </a>
                   </div>
                 </div>

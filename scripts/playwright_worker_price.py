@@ -6,98 +6,356 @@ def parse_precio(texto: str) -> int:
     """Extrae números de un texto de precio y lo convierte a entero"""
     numeros = re.findall(r"\d+", texto.replace(",", "").replace(".", "").replace("$", "").replace("MXN", "").strip())
     return int("".join(numeros)) if numeros else 0
-
 def configurar_huespedes(page, habitaciones, adultos, ninos):
-    """Configura el número de huéspedes y habitaciones"""
+    """Configura el número de huéspedes y habitaciones siguiendo la lógica exacta del sitio"""
     try:
-        print(f"\n=== CONFIGURING GUESTS ===")
-        print(f"Rooms: {habitaciones}, Adults: {adultos}, Children: {ninos}")
+        print(f"\n{'='*60}")
+        print("CONFIGURING GUESTS")
+        print(f"{'='*60}")
+        print(f"Target: {habitaciones} room(s), {adultos} adult(s), {ninos} children")
         
-        # Click en el input de huéspedes - usar el ID correcto
+        # 1. Abrir el modal de huéspedes
         paxes_input = page.locator("input#packages_pax-value")
         expect(paxes_input).to_be_visible(timeout=10000)
         paxes_input.click()
+        time.sleep(2)
+        
+        # Esperar a que aparezca el modal
+        page.wait_for_selector("div.search-paxes.modal-active", timeout=10000)
         time.sleep(1.5)
         
-        # Esperar a que aparezca el modal de huéspedes
-        page.wait_for_selector("div.search-paxes.modal-active", timeout=10000)
-        time.sleep(1)
+        print("\n✓ Modal opened successfully")
         
-        # === HABITACIONES PRIMERO ===
-        # Primero configurar habitaciones si necesitamos más de una
-        if habitaciones > 1:
-            print(f"Adding {habitaciones - 1} additional room(s)...")
-            btn_add_room = page.locator("button.btnTertiary:has-text('Agregar habitación')")
-            for _ in range(habitaciones - 1):
+        # 2. AGREGAR HABITACIONES SI ES NECESARIO
+        habitaciones_actuales = page.locator("div.search-paxes .col-12.mobile-list").count()
+        print(f"\nCurrent rooms: {habitaciones_actuales}")
+        print(f"Target rooms: {habitaciones}")
+        
+        if habitaciones > habitaciones_actuales:
+            habitaciones_a_agregar = habitaciones - habitaciones_actuales
+            print(f"\n→ Adding {habitaciones_a_agregar} room(s)...")
+            
+            btn_add_room = page.locator("button.btnTertiary:has-text('Add another room'), button.btnTertiary:has-text('Agregar habitación')")
+            
+            for i in range(habitaciones_a_agregar):
                 if btn_add_room.count() > 0:
-                    btn_add_room.click()
-                    time.sleep(0.8)
-            print(f"✓ Total rooms: {habitaciones}")
+                    btn_add_room.first.click()
+                    time.sleep(1.5)
+                    print(f"  ✓ Room {habitaciones_actuales + i + 1} added")
+                else:
+                    print(f"  ✗ Add room button not found")
+                    break
+            
+            # Verificar
+            habitaciones_finales = page.locator("div.search-paxes .col-12.mobile-list").count()
+            print(f"✓ Total rooms after adding: {habitaciones_finales}")
         
-        # === CONFIGURAR CADA HABITACIÓN ===
-        # Distribuir adultos y niños entre las habitaciones
+        # 3. DISTRIBUIR PASAJEROS POR HABITACIÓN
         adultos_por_hab = adultos // habitaciones
         ninos_por_hab = ninos // habitaciones
         adultos_restantes = adultos % habitaciones
         ninos_restantes = ninos % habitaciones
         
+        print(f"\n{'='*60}")
+        print("DISTRIBUTION PLAN")
+        print(f"{'='*60}")
+        print(f"Base per room: {adultos_por_hab} adult(s), {ninos_por_hab} children")
+        print(f"Extra to distribute: {adultos_restantes} adult(s), {ninos_restantes} children")
+        
+        # 4. CONFIGURAR CADA HABITACIÓN
         for hab_idx in range(habitaciones):
-            print(f"\nConfiguring Room {hab_idx + 1}...")
+            print(f"\n{'─'*60}")
+            print(f"CONFIGURING ROOM {hab_idx + 1}")
+            print(f"{'─'*60}")
             
-            # Calcular adultos y niños para esta habitación
+            # Calcular pasajeros para esta habitación
             adultos_esta_hab = adultos_por_hab + (1 if hab_idx < adultos_restantes else 0)
             ninos_esta_hab = ninos_por_hab + (1 if hab_idx < ninos_restantes else 0)
             
-            # Locator para esta habitación específica
-            room_container = page.locator(f"div.search-paxes .col-12.mobile-list").nth(hab_idx)
+            print(f"Target: {adultos_esta_hab} adult(s), {ninos_esta_hab} children")
             
-            # === ADULTOS ===
-            # Obtener el contador actual de adultos para esta habitación
-            adultos_counter = room_container.locator("div.row:has-text('Adultos') p.input-stepper-counter")
-            if adultos_counter.count() > 0:
-                adultos_actuales = int(adultos_counter.inner_text().strip())
-                print(f"  Current adults: {adultos_actuales}, target: {adultos_esta_hab}")
-                
-                if adultos_esta_hab > adultos_actuales:
-                    btn_add = room_container.locator("div.row:has-text('Adultos') button:has(i.icons-add)")
-                    for _ in range(adultos_esta_hab - adultos_actuales):
-                        btn_add.click()
-                        time.sleep(0.3)
-                elif adultos_esta_hab < adultos_actuales:
-                    btn_remove = room_container.locator("div.row:has-text('Adultos') button:has(i.icons-remove)")
-                    for _ in range(adultos_actuales - adultos_esta_hab):
-                        btn_remove.click()
-                        time.sleep(0.3)
-                
-                print(f"  ✓ Adults set to: {adultos_esta_hab}")
+            # Localizar el contenedor de esta habitación
+            room_container = page.locator("div.search-paxes .col-12.mobile-list").nth(hab_idx)
             
-            # === NIÑOS ===
+            if room_container.count() == 0:
+                print(f"✗ Room {hab_idx + 1} container not found!")
+                continue
+            
+            # Verificar el título de la habitación para asegurar que estamos en la correcta
+            room_title = room_container.locator("p.h5.mb-0").first
+            if room_title.count() > 0:
+                title_text = room_title.inner_text().strip()
+                print(f"  Verified: {title_text}")
+            
+            # ===== RESETEAR Y CONFIGURAR ADULTOS =====
+            print(f"\n→ Configuring adults...")
+            
+            # Dar tiempo para que se renderice la habitación
+            time.sleep(0.5)
+            
+            # Leer el contador actual de adultos
+            adultos_counter = room_container.locator("div.row:has-text('Adults') p.input-stepper-counter, div.row:has-text('Adultos') p.input-stepper-counter").first
+            
+            if adultos_counter.count() == 0:
+                print("  ✗ Adults counter not found")
+            else:
+                try:
+                    adultos_actuales_text = adultos_counter.inner_text().strip()
+                    adultos_actuales = int(adultos_actuales_text)
+                    print(f"  Current: {adultos_actuales} adult(s)")
+                    print(f"  Target: {adultos_esta_hab} adult(s)")
+                    
+                    # PASO 1: RESETEAR A 1 (mínimo permitido)
+                    # Primero bajar todos los adultos al mínimo (1)
+                    if adultos_actuales > 1:
+                        clicks_para_resetear = adultos_actuales - 1
+                        print(f"  → Resetting to minimum (1 adult)...")
+                        btn_remove = room_container.locator("div.row:has-text('Adults') button:has(i.icons-remove), div.row:has-text('Adultos') button:has(i.icons-remove)").first
+                        
+                        for _ in range(clicks_para_resetear):
+                            if btn_remove.count() > 0:
+                                btn_remove.click()
+                                time.sleep(0.3)
+                            else:
+                                print("    ✗ Remove button not found")
+                                break
+                        
+                        # Verificar que llegamos a 1
+                        nuevo_valor = int(room_container.locator("div.row:has-text('Adults') p.input-stepper-counter, div.row:has-text('Adultos') p.input-stepper-counter").first.inner_text().strip())
+                        print(f"    Reset: {adultos_actuales} → {nuevo_valor}")
+                    
+                    # PASO 2: AGREGAR DESDE 1 HASTA EL TARGET
+                    # Ahora agregar desde 1 hasta el target
+                    if adultos_esta_hab > 1:
+                        clicks_para_agregar = adultos_esta_hab - 1
+                        print(f"  → Adding {clicks_para_agregar} adult(s) from minimum...")
+                        btn_add = room_container.locator("div.row:has-text('Adults') button:has(i.icons-add), div.row:has-text('Adultos') button:has(i.icons-add)").first
+                        
+                        for _ in range(clicks_para_agregar):
+                            if btn_add.count() > 0:
+                                btn_add.click()
+                                time.sleep(0.3)
+                            else:
+                                print("    ✗ Add button not found")
+                                break
+                        
+                        # Verificar el valor final
+                        valor_final = int(room_container.locator("div.row:has-text('Adults') p.input-stepper-counter, div.row:has-text('Adultos') p.input-stepper-counter").first.inner_text().strip())
+                        print(f"  ✓ Adults configured: 1 → {valor_final}")
+                    else:
+                        print(f"  ✓ Adults already at minimum (1)")
+                
+                except Exception as e:
+                    print(f"  ✗ Error configuring adults: {e}")
+            
+            # ===== RESETEAR Y CONFIGURAR NIÑOS =====
+            print(f"\n→ Configuring children...")
+            
+            # Dar tiempo para que se actualice el DOM después de configurar adultos
+            time.sleep(0.5)
+            
+            # Leer el contador actual de niños
+            ninos_counter = room_container.locator("div.row:has-text('Children') p.input-stepper-counter, div.row:has-text('Menores') p.input-stepper-counter").first
+            
+            if ninos_counter.count() == 0:
+                print("  ✗ Children counter not found")
+            else:
+                try:
+                    ninos_actuales_text = ninos_counter.inner_text().strip()
+                    ninos_actuales = int(ninos_actuales_text)
+                    print(f"  Current: {ninos_actuales} children")
+                    print(f"  Target: {ninos_esta_hab} children")
+                    
+                    # PASO 1: RESETEAR A 0 (mínimo permitido para niños)
+                    # Primero bajar todos los niños a 0
+                    if ninos_actuales > 0:
+                        clicks_para_resetear = ninos_actuales
+                        print(f"  → Resetting to minimum (0 children)...")
+                        btn_remove = room_container.locator("div.row:has-text('Children') button:has(i.icons-remove), div.row:has-text('Menores') button:has(i.icons-remove)").first
+                        
+                        for _ in range(clicks_para_resetear):
+                            if btn_remove.count() > 0:
+                                btn_remove.click()
+                                time.sleep(0.4)
+                            else:
+                                print("    ✗ Remove button not found")
+                                break
+                        
+                        # Verificar que llegamos a 0
+                        nuevo_valor = int(room_container.locator("div.row:has-text('Children') p.input-stepper-counter, div.row:has-text('Menores') p.input-stepper-counter").first.inner_text().strip())
+                        print(f"    Reset: {ninos_actuales} → {nuevo_valor}")
+                        time.sleep(0.5)  # Dar tiempo para que desaparezcan los selectores de edad
+                    
+                    # PASO 2: AGREGAR DESDE 0 HASTA EL TARGET
+                    # Ahora agregar desde 0 hasta el target
+                    if ninos_esta_hab > 0:
+                        clicks_para_agregar = ninos_esta_hab
+                        print(f"  → Adding {clicks_para_agregar} children from minimum...")
+                        btn_add = room_container.locator("div.row:has-text('Children') button:has(i.icons-add), div.row:has-text('Menores') button:has(i.icons-add)").first
+                        
+                        for click_idx in range(clicks_para_agregar):
+                            if btn_add.count() > 0:
+                                btn_add.click()
+                                time.sleep(0.7)  # Más tiempo porque aparecen selectores de edad
+                                print(f"    Child {click_idx + 1} added")
+                            else:
+                                print("    ✗ Add button not found")
+                                break
+                        
+                        # Verificar el valor final
+                        valor_final = int(room_container.locator("div.row:has-text('Children') p.input-stepper-counter, div.row:has-text('Menores') p.input-stepper-counter").first.inner_text().strip())
+                        print(f"  ✓ Children configured: 0 → {valor_final}")
+                    else:
+                        print(f"  ✓ No children needed for this room")
+                
+                except Exception as e:
+                    print(f"  ✗ Error configuring children: {e}")
+            
+            # ===== CONFIGURAR EDADES DE NIÑOS =====
             if ninos_esta_hab > 0:
-                ninos_counter = room_container.locator("div.row:has-text('Menores') p.input-stepper-counter")
-                if ninos_counter.count() > 0:
-                    ninos_actuales = int(ninos_counter.inner_text().strip())
-                    print(f"  Current children: {ninos_actuales}, target: {ninos_esta_hab}")
+                print(f"\n→ Configuring children ages...")
+                time.sleep(1.5)  # Dar tiempo para que aparezcan los selectores
+                
+                # Buscar todos los selectores de edad dentro de esta habitación
+                # Los selectores tienen name="children_{paxIndex}_{childIndex}"
+                age_selects = room_container.locator("select[name^='children']")
+                selects_count = age_selects.count()
+                
+                print(f"  Found {selects_count} age selector(s)")
+                
+                if selects_count > 0:
+                    for child_idx in range(min(selects_count, ninos_esta_hab)):
+                        try:
+                            select = age_selects.nth(child_idx)
+                            
+                            # Verificar si ya tiene un valor
+                            current_value = select.input_value()
+                            
+                            if not current_value or current_value == "null" or current_value == "object:null":
+                                # Seleccionar 5 años (value="number:6")
+                                # En PriceTravel: 1=0-23months, 2=2years, 3=3years, etc.
+                                select.select_option(value="number:6")
+                                time.sleep(0.4)
+                                print(f"    ✓ Child {child_idx + 1}: Set to 5 years")
+                            else:
+                                print(f"    ℹ Child {child_idx + 1}: Age already set")
+                        
+                        except Exception as e:
+                            print(f"    ✗ Error setting age for child {child_idx + 1}: {e}")
                     
-                    btn_add = room_container.locator("div.row:has-text('Menores') button:has(i.icons-add)")
-                    for _ in range(ninos_esta_hab - ninos_actuales):
-                        btn_add.click()
-                        time.sleep(0.5)
+                    print(f"  ✓ All ages configured for room {hab_idx + 1}")
+                else:
+                    print(f"  ⚠ No age selectors found (expected {ninos_esta_hab})")
+        
+        # 5. APLICAR CAMBIOS
+        print(f"\n{'='*60}")
+        print("APPLYING CONFIGURATION")
+        print(f"{'='*60}")
+        time.sleep(2)  # Dar tiempo para que se procese todo
+        
+        # Buscar el botón Apply
+        apply_btn = page.locator("button[name='apply-button']")
+        
+        if apply_btn.count() == 0:
+            print("✗ Apply button not found!")
+            return False
+        
+        # Verificar si está habilitado
+        is_disabled = apply_btn.evaluate("btn => btn.disabled")
+        
+        if is_disabled:
+            print("⚠ Apply button is DISABLED")
+            print("→ Checking for missing age selectors...")
+            
+            # Intentar llenar TODOS los selectores vacíos en TODO el modal
+            all_selects = page.locator("select[name^='children']")
+            total_selects = all_selects.count()
+            
+            print(f"  Found {total_selects} total age selector(s) in modal")
+            
+            filled_count = 0
+            for i in range(total_selects):
+                try:
+                    select = all_selects.nth(i)
+                    current_value = select.input_value()
                     
-                    print(f"  ✓ Children set to: {ninos_esta_hab}")
+                    if not current_value or current_value == "null" or current_value == "object:null":
+                        select.select_option(value="number:6")
+                        time.sleep(0.3)
+                        filled_count += 1
+                        print(f"    Filled selector {i + 1}")
+                except:
+                    pass
+            
+            if filled_count > 0:
+                print(f"  ✓ Filled {filled_count} missing age selector(s)")
+                time.sleep(1)
+                
+                # Re-verificar si ahora está habilitado
+                is_disabled = apply_btn.evaluate("btn => btn.disabled")
+                
+                if is_disabled:
+                    print("  ⚠ Button still disabled after filling ages")
+                else:
+                    print("  ✓ Button is now enabled!")
+        else:
+            print("✓ Apply button is enabled")
         
-        # Aplicar cambios
-        print("\nApplying guest configuration...")
-        btn_aplicar = page.locator("button.btnPrimary:has-text('Aplicar')")
-        btn_aplicar.click()
-        time.sleep(2)
+        # Intentar hacer click de todas formas
+        print("\n→ Clicking Apply button...")
+        try:
+            apply_btn.click(force=True, timeout=5000)
+            time.sleep(2.5)
+            print("✓ Apply button clicked successfully")
+        except Exception as e:
+            print(f"⚠ Could not click Apply button: {e}")
+            print("→ Trying alternative: Close button...")
+            
+            close_btn = page.locator("button:has(i.icons-close)").first
+            if close_btn.count() > 0:
+                close_btn.click()
+                time.sleep(1.5)
+                print("✓ Modal closed with close button")
         
-        print("✓ Guest configuration applied successfully")
+        # 6. VERIFICAR QUE EL MODAL SE CERRÓ
+        time.sleep(1)
+        modal_visible = page.locator("div.search-paxes.modal-active").count() > 0
+        
+        if modal_visible:
+            print("\n⚠ Modal still visible after clicking Apply")
+            print("→ Trying to close by clicking outside...")
+            page.mouse.click(50, 50)
+            time.sleep(1)
+            
+            modal_visible = page.locator("div.search-paxes.modal-active").count() > 0
+            if not modal_visible:
+                print("✓ Modal closed by clicking outside")
+            else:
+                print("✗ Modal could not be closed")
+                return False
+        else:
+            print("✓ Modal closed successfully")
+        
+        print(f"\n{'='*60}")
+        print("✓ GUEST CONFIGURATION COMPLETED")
+        print(f"{'='*60}\n")
+        
         return True
         
     except Exception as e:
-        print(f"ERROR configuring guests: {e}")
+        print(f"\n{'='*60}")
+        print("✗ CRITICAL ERROR IN GUEST CONFIGURATION")
+        print(f"{'='*60}")
+        print(f"Error: {e}")
         import traceback
         traceback.print_exc()
+        
+        try:
+            page.screenshot(path="error_huespedes.png", full_page=True)
+            print("\n📸 Screenshot saved: error_huespedes.png")
+        except:
+            pass
+        
         return False
 
 def extraer_vuelo_recomendado(page):
@@ -293,49 +551,44 @@ def extraer_paquetes(page):
         print(f"Error extracting packages: {e}")
     
     return resultados
-
 def seleccionar_fecha_easepick(page, fecha_objetivo, es_fecha_vuelta=False):
     """Selecciona una fecha en el calendario easepick usando data-time dentro de Shadow DOM"""
     try:
         fecha_obj = datetime.strptime(fecha_objetivo, "%Y-%m-%d")
         timestamp_objetivo = int(fecha_obj.timestamp() * 1000)
-        
+
         mes_objetivo = fecha_obj.month
         año_objetivo = fecha_obj.year
         dia_objetivo = fecha_obj.day
-        
-        # Nombres de meses en inglés (lowercase para comparación)
+
         meses_en = ["january", "february", "march", "april", "may", "june",
                     "july", "august", "september", "october", "november", "december"]
-        
+
         print(f"\n{'='*60}")
         print(f"SEARCHING {'RETURN' if es_fecha_vuelta else 'DEPARTURE'} DATE")
         print(f"{'='*60}")
         print(f"Target: {dia_objetivo} {meses_en[mes_objetivo-1].capitalize()} {año_objetivo}")
         print(f"Timestamp: {timestamp_objetivo}")
-        
-        # Acceder al Shadow DOM del calendario
+
         shadow_host = page.locator("span.easepick-wrapper")
-        
+
         max_intentos = 24
         intentos = 0
-        
+
         while intentos < max_intentos:
             time.sleep(1)
-            
-            # Evaluar dentro del Shadow DOM usando JavaScript
+
             calendars_info = page.evaluate("""
                 () => {
                     const shadowHost = document.querySelector('span.easepick-wrapper');
                     if (!shadowHost || !shadowHost.shadowRoot) return null;
-                    
+
                     const calendars = shadowHost.shadowRoot.querySelectorAll('div.calendar');
                     const result = [];
-                    
+
                     calendars.forEach((cal, idx) => {
                         const monthNameDiv = cal.querySelector('.month-name');
                         if (monthNameDiv) {
-                            // El texto completo incluye el mes dentro del <span> y el año como texto suelto
                             const fullText = monthNameDiv.textContent.trim();
                             result.push({
                                 index: idx,
@@ -343,116 +596,129 @@ def seleccionar_fecha_easepick(page, fecha_objetivo, es_fecha_vuelta=False):
                             });
                         }
                     });
-                    
+
                     return result;
                 }
             """)
-            
+
             if not calendars_info:
                 print(f"Attempt {intentos + 1}/{max_intentos} - Shadow DOM not ready")
                 intentos += 1
                 continue
-            
+
             print(f"\nAttempt {intentos + 1}/{max_intentos} - Found {len(calendars_info)} calendars")
-            
-            # Buscar en cada calendario
+
             found = False
             for cal_info in calendars_info:
                 cal_idx = cal_info['index']
                 header_text = cal_info['header']
-                
+
                 print(f"  Calendar {cal_idx + 1}: '{header_text}'")
-                
-                # Parse el header "January 2028" o "February 2028"
+
                 partes = header_text.lower().split()
                 if len(partes) < 2:
                     continue
-                
+
                 mes_nombre = partes[0].strip()
                 try:
                     año_calendario = int(partes[1].strip())
                 except ValueError:
                     continue
-                
-                # Verificar si este calendario tiene el mes/año objetivo
+
                 mes_objetivo_nombre = meses_en[mes_objetivo - 1]
-                
+
                 if mes_nombre == mes_objetivo_nombre and año_calendario == año_objetivo:
                     print(f"  ✓ MATCH FOUND in Calendar {cal_idx + 1}")
-                    
-                    # Buscar el día específico dentro del Shadow DOM
+
                     day_clicked = page.evaluate(f"""
                         (timestamp) => {{
                             const shadowHost = document.querySelector('span.easepick-wrapper');
                             if (!shadowHost || !shadowHost.shadowRoot) return false;
-                            
+
                             const calendars = shadowHost.shadowRoot.querySelectorAll('div.calendar');
                             const calendar = calendars[{cal_idx}];
                             if (!calendar) return false;
-                            
+
                             const days = calendar.querySelectorAll('div.day.unit:not(.not-available)');
-                            
+
                             for (let day of days) {{
                                 const dataTime = day.getAttribute('data-time');
                                 if (dataTime) {{
                                     const dayTimestamp = parseInt(dataTime);
                                     const diff = Math.abs(dayTimestamp - timestamp);
                                     const diffHours = diff / (1000 * 60 * 60);
-                                    
+
                                     if (diffHours < 12) {{
-                                        console.log('Clicking day:', day.textContent.trim());
                                         day.click();
                                         return true;
                                     }}
                                 }}
                             }}
-                            
+
                             return false;
                         }}
                     """, timestamp_objetivo)
-                    
+
                     if day_clicked:
                         print(f"  ✓ DAY CLICKED successfully")
                         time.sleep(1.5)
                         return True
                     else:
                         print(f"  ✗ Day {dia_objetivo} not found in this calendar")
-            
-            # Si no encontramos el mes/año, avanzar
+
+            # Si no encontramos el mes/año, decidir si avanzar o retroceder
             if not found:
-                print("  → Moving to next month...")
-                
-                # Click en el botón "next" dentro del Shadow DOM
-                next_clicked = page.evaluate("""
-                    () => {
-                        const shadowHost = document.querySelector('span.easepick-wrapper');
-                        if (!shadowHost || !shadowHost.shadowRoot) return false;
-                        
-                        const nextButtons = shadowHost.shadowRoot.querySelectorAll('button.next-button.unit');
-                        if (nextButtons.length > 0) {
-                            nextButtons[nextButtons.length - 1].click();
-                            return true;
-                        }
-                        return false;
-                    }
-                """)
-                
-                if not next_clicked:
-                    print("  ✗ Next button not found")
-                    return False
-                
+                # Tomar el primer calendario como referencia
+                ref_header = calendars_info[0]['header'].lower().split()
+                if len(ref_header) >= 2:
+                    mes_actual_nombre = ref_header[0]
+                    año_actual = int(ref_header[1])
+                    mes_actual_index = meses_en.index(mes_actual_nombre)
+
+                    mes_objetivo_index = mes_objetivo - 1
+
+                    if año_actual > año_objetivo or (año_actual == año_objetivo and mes_actual_index > mes_objetivo_index):
+                        print("  → Going to previous month...")
+                        page.evaluate("""
+                            () => {
+                                const shadowHost = document.querySelector('span.easepick-wrapper');
+                                if (!shadowHost || !shadowHost.shadowRoot) return false;
+                                const prevButtons = shadowHost.shadowRoot.querySelectorAll('button.previous-button.unit');
+                                if (prevButtons.length > 0) {
+                                    prevButtons[0].click();
+                                    return true;
+                                }
+                                return false;
+                            }
+                        """)
+                    else:
+                        print("  → Moving to next month...")
+                        page.evaluate("""
+                            () => {
+                                const shadowHost = document.querySelector('span.easepick-wrapper');
+                                if (!shadowHost || !shadowHost.shadowRoot) return false;
+                                const nextButtons = shadowHost.shadowRoot.querySelectorAll('button.next-button.unit');
+                                if (nextButtons.length > 0) {
+                                    nextButtons[nextButtons.length - 1].click();
+                                    return true;
+                                }
+                                return false;
+                            }
+                        """)
+
                 time.sleep(1)
-            
+
             intentos += 1
-        
+
         print(f"\n✗ Could not find date after {max_intentos} attempts")
         return False
-        
+
     except Exception as e:
         print(f"\n✗ ERROR: {e}")
         import traceback
         traceback.print_exc()
         return False
+
 
 def run(origen, destino, fecha_ida, fecha_vuelta, habitaciones, adultos, ninos, perfil="Default"):
     with sync_playwright() as p:
